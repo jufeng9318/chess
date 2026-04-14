@@ -55,16 +55,16 @@ public class Evaluator {
     };
 
     private static final int[][] HORSE_TABLE = {
-        {-20,-10,-10, -5, -5,-10,-10,-20},
-        {-10,  0,  5,  5,  5,  5,  0,-10},
-        {-10,  5, 10, 10, 10, 10,  5,-10},
-        {-10,  5, 10, 15, 15, 10,  5,-10},
-        {-10,  5, 10, 15, 15, 10,  5,-10},
-        {-10,  5, 10, 10, 10, 10,  5,-10},
-        {-10,  0,  5,  5,  5,  5,  0,-10},
-        {-20,-10,-10, -5, -5,-10,-10,-20},
-        {  0,  0,  0,  0,  0,  0,  0,  0},
-        {  0,  0,  0,  0,  0,  0,  0,  0},
+        {-20,-10,-10, -5, -5,-10,-10,-20,  0},
+        {-10,  0,  5,  5,  5,  5,  0,-10,  0},
+        {-10,  5, 10, 10, 10, 10,  5,-10,  0},
+        {-10,  5, 10, 15, 15, 10,  5,-10,  0},
+        {-10,  5, 10, 15, 15, 10,  5,-10,  0},
+        {-10,  5, 10, 10, 10, 10,  5,-10,  0},
+        {-10,  0,  5,  5,  5,  5,  0,-10,  0},
+        {-20,-10,-10, -5, -5,-10,-10,-20,  0},
+        {  0,  0,  0,  0,  0,  0,  0,  0,  0},
+        {  0,  0,  0,  0,  0,  0,  0,  0,  0},
     };
 
     private int getBaseValue(PieceType type) {
@@ -85,11 +85,7 @@ public class Evaluator {
         int redRow = 9 - r; // 黑方翻转视角
 
         return switch (p.type) {
-            case PAWN -> {
-                int river = PAWN_TABLE[redRow][c];
-                boolean crossed = (p.color == Color.RED && r <= 4) || (p.color == Color.BLACK && r >= 5);
-                yield river + (crossed ? RIVER_BONUS : 0);
-            }
+            case PAWN -> PAWN_TABLE[redRow][c];
             case CHARIOT -> CHARIOT_TABLE[redRow][c];
             case CANNON  -> CANNON_TABLE[redRow][c];
             case HORSE   -> HORSE_TABLE[redRow][c];

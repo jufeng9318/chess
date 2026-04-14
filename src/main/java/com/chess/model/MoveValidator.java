@@ -16,8 +16,9 @@ public class MoveValidator {
     }
 
     public static boolean inRiver(Color color, int row) {
-        if (color == Color.RED) return row <= 4;
-        return row >= 5;
+        // 红方在 rows 7-9（棋盘下方），黑方在 rows 0-2（棋盘上方）
+        if (color == Color.RED) return row >= 5;
+        return row <= 4;
     }
 
     public static boolean isEmpty(Board board, int row, int col) {
@@ -136,10 +137,10 @@ public class MoveValidator {
                 } else {
                     if (isEnemy(board, nr, nc, cannon.color)) {
                         moves.add(new Move(cannon, nr, nc));
-                        break;
-                    } else {
-                        break;
+                        break; // 吃完敌方棋子后停止
                     }
+                    // 遇到己方棋子后停止搜索（空格子继续）
+                    if (!isEmpty(board, nr, nc)) break;
                 }
                 nr += d[0];
                 nc += d[1];

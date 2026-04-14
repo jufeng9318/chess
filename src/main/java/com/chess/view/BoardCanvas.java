@@ -20,6 +20,23 @@ public class BoardCanvas extends Canvas {
     private Piece           selectedPiece;
     private List<Move>      validMoves = List.of();
 
+    // 通过 classpath 资源加载字体（最可靠）
+    private static final Font RED_FONT   = loadResource("/fonts/simkai.ttf", 28);
+    private static final Font BLACK_FONT = loadResource("/fonts/simfang.ttf", 28);
+
+    private static Font loadResource(String resourcePath, double size) {
+        try {
+            Font f = Font.loadFont(BoardCanvas.class.getResourceAsStream(resourcePath), size);
+            if (f != null) {
+                System.out.println("[Font] OK: " + resourcePath + " -> " + f.getName());
+                return f;
+            }
+        } catch (Exception e) {
+            System.err.println("[Font] FAILED: " + resourcePath + " -> " + e.getMessage());
+        }
+        return Font.font("KaiTi", FontWeight.BOLD, size);
+    }
+
     public BoardCanvas(double width, double height) {
         super(width, height);
         this.board = new Board();
@@ -179,8 +196,8 @@ public class BoardCanvas extends Canvas {
         gc.strokeOval(cx - PIECE_RADIUS + 4, cy - PIECE_RADIUS + 4,
                       (PIECE_RADIUS - 4) * 2, (PIECE_RADIUS - 4) * 2);
 
-        // 棋子文字
-        Font pieceFont = Font.font("KaiTi", FontWeight.BOLD, 28);
+        // 棋子文字（显式加载的中文字体）
+        Font pieceFont = p.color == Color.RED ? RED_FONT : BLACK_FONT;
         gc.setFont(pieceFont);
         gc.setFill(textColor);
 

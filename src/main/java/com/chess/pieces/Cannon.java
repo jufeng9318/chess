@@ -9,6 +9,6 @@ public class Cannon extends Piece {
 
     @Override
     public String getChar() {
-        return color == Color.RED ? "砲" : "炮";
+        return color == Color.RED ? "炮" : "炮";
     }
 }
