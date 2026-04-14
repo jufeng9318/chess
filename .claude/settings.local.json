@@ -1,0 +1,38 @@
+{
+  "permissions": {
+    "allow": [
+         "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Git",
+      "Npm",
+      "Pip",
+      "Grep",
+      "Glob",
+      "Bash(where openspec:*)",
+      "Bash(openspec:*)",
+      "Bash(mvn test -pl leatop-msdp-smp-serviceimpl -Dtest=UpgradePackageTaskDetailServiceImplTest -DfailIfNoTests=false)",
+      "Bash(mvn compile -pl leatop-msdp-smp-openservice -am)",
+      "Bash(mvn dependency:tree -Dverbose)",
+      "Bash(mvn compile -DskipTests)",
+      "Bash(mvn compile -DskipTests -T 1C)",
+      "Bash(mvn dependency:tree -pl leatop-msdp-smp-serviceimpl -DincludeArtifactIds=fastjson)",
+      "Bash(mvn dependency:tree -pl leatop-msdp-smp-serviceimpl)",
+      "Bash(for mod in leatop-msdp-smp-openservice leatop-msdp-smp-webadmin leatop-msdp-smp-appadmin leatop-msdp-smp-scanner)",
+      "Bash(do echo \"=== $mod ===\")",
+      "Bash(mvn dependency:tree -pl $mod)",
+      "Bash(done)",
+      "Bash(for mod in leatop-msdp-smp-job leatop-msdp-smp-virus leatop-msdp-security-server leatop-msdp-smp-analysis leatop-msdp-smp-starsobservatory leatop-msdp-smp-virus360)",
+      "Bash(for mod in leatop-msdp-smp-job-kafka leatop-msdp-smp-job-kafka-event leatop-msdp-smp-assetSyncPro leatop-msdp-smp-gzwreport leatop-msdp-smp-task)",
+      "Bash(mvn compile -T 2C)",
+      "Bash(mvn clean install -T 2C -DskipTests)",
+      "Bash(mvn clean)",
+      "Bash(mvn install -T 2C -DskipTests)",
+      "Bash(mvn enforcer:enforce -Drule=requireNoRepositoriesAreReleased -Drule=requireReleaseDeps)",
+      "Bash(mvn test:*)",
+      "Bash(mvn compile:*)",
+      "Bash(mvn clean:*)"
+    ]
+  }
+}
