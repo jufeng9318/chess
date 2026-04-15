@@ -16,9 +16,9 @@ public class MoveValidator {
     }
 
     public static boolean inRiver(Color color, int row) {
-        // 红方在 rows 7-9（棋盘下方），黑方在 rows 0-2（棋盘上方）
-        if (color == Color.RED) return row >= 5;
-        return row <= 4;
+        // 红方过河 = 进入黑方区域 row 0-4；黑方过河 = 进入红方区域 row 5-9
+        if (color == Color.RED) return row <= 4;
+        return row >= 5;
     }
 
     public static boolean isEmpty(Board board, int row, int col) {
