@@ -129,10 +129,25 @@ public class BoardCanvas extends Canvas {
         Font chFont = Font.font("KaiTi", FontWeight.BOLD, 22);
         gc.setFont(chFont);
         gc.setFill(javafx.scene.paint.Color.web("#5C3A1E"));
-        double midY = toY(4) + 28;
-        // 河宽7列，楚河居中于左半边(≈col2.67)，漢界居中于右半边(≈col6.33)
-        gc.fillText("楚 河", toX(3) - 26,  midY);
-        gc.fillText("漢 界", toX(6) + 26, midY);
+
+        // 用 Text API 精确测量文本宽度，实现真正居中
+        javafx.scene.text.Text chuhe = new javafx.scene.text.Text("楚 河");
+        chuhe.setFont(chFont);
+        double chuheW = chuhe.getLayoutBounds().getWidth();
+
+        javafx.scene.text.Text hanjie = new javafx.scene.text.Text("漢 界");
+        hanjie.setFont(chFont);
+        double hanjieW = hanjie.getLayoutBounds().getWidth();
+
+        // 垂直居中于河区域（河区域 y=280~340，中心=310）
+        double midY = toY(4) + 35;
+
+        // 水平居中：河左半边中心 x=190，右半边中心 x=400
+        double x1 = 190 - chuheW / 2 - 15; // 偏右，左移
+        double x2 = 400 - hanjieW / 2 - 8;
+
+        gc.fillText("楚 河", x1, midY);
+        gc.fillText("漢 界", x2, midY);
 
         int[][] marks = {
             {3,0},{3,2},{3,4},{3,6},{3,8},
