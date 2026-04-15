@@ -20,21 +20,25 @@ public class BoardCanvas extends Canvas {
     private Piece           selectedPiece;
     private List<Move>      validMoves = List.of();
 
-    // 通过 classpath 资源加载字体（最可靠）
-    private static final Font RED_FONT   = loadResource("/fonts/simkai.ttf", 28);
-    private static final Font BLACK_FONT = loadResource("/fonts/simfang.ttf", 28);
+    // 通过 classpath 资源 URL 加载字体（全局注册，最可靠）
+    private static final Font RED_FONT   = loadFont("/fonts/simkai.ttf", "KaiTi",   28);
+    private static final Font BLACK_FONT = loadFont("/fonts/simfang.ttf", "FangSong", 28);
 
-    private static Font loadResource(String resourcePath, double size) {
+    private static Font loadFont(String resourcePath, String family, double size) {
         try {
-            Font f = Font.loadFont(BoardCanvas.class.getResourceAsStream(resourcePath), size);
-            if (f != null) {
-                System.out.println("[Font] OK: " + resourcePath + " -> " + f.getName());
-                return f;
+            var url = BoardCanvas.class.getResource(resourcePath);
+            if (url != null) {
+                // Font.loadFont(String url, double size) 全局注册字体，返回的 Font 可直接使用
+                Font f = Font.loadFont(url.toExternalForm(), size);
+                System.out.println("[Font] Loaded: " + resourcePath + " -> " + (f != null ? f.getName() : "NULL"));
+                if (f != null) return f;
+            } else {
+                System.err.println("[Font] Resource not found: " + resourcePath);
             }
         } catch (Exception e) {
-            System.err.println("[Font] FAILED: " + resourcePath + " -> " + e.getMessage());
+            System.err.println("[Font] FAILED: " + resourcePath + " -> " + e);
         }
-        return Font.font("KaiTi", FontWeight.BOLD, size);
+        return Font.font("Arial Unicode MS", FontWeight.BOLD, size);
     }
 
     public BoardCanvas(double width, double height) {

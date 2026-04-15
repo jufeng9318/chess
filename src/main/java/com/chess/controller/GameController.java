@@ -16,7 +16,7 @@ public class GameController {
 
     private Board    board;
     private BoardCanvas canvas;
-    private ChessAI  ai;
+    private ChessEngine engine;
     private State    state;
     private Color    currentTurn;  // 红方先行
     private Piece    selectedPiece;
@@ -26,7 +26,7 @@ public class GameController {
     public GameController(BoardCanvas canvas, Difficulty difficulty) {
         this.canvas      = canvas;
         this.board       = canvas.getBoard();
-        this.ai          = new ChessAI(difficulty);
+        this.engine      = new OurEngine(difficulty);
         this.state       = State.PLAYER_TURN;
         this.currentTurn = Color.RED;
         this.playerColor = Color.RED;
@@ -110,11 +110,11 @@ public class GameController {
         Thread aiThread = new Thread(() -> {
             try { Thread.sleep(300); } catch (InterruptedException e) {}
 
-            Move aiMove = ai.getBestMove(board, aiColor());
+            Move resultMove = engine.getBestMove(board, aiColor());
 
             Platform.runLater(() -> {
-                if (aiMove != null) {
-                    aiMove.execute(board);
+                if (resultMove != null) {
+                    resultMove.execute(board);
                     canvas.draw();
 
                     if (!checkGameOver()) {
@@ -157,17 +157,17 @@ public class GameController {
     }
 
     private void showEndDialog(String message) {
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        Alert alert = new Alert(Alert.AlertType.INFORMATION, message);
         alert.setTitle("游戏结束");
-        alert.setHeaderText(message);
         alert.showAndWait();
     }
 
     public void restart(Difficulty difficulty) {
+        engine.shutdown();
         this.board  = new Board();
         this.board.init();
-        this.ai     = new ChessAI(difficulty);
-        this.state  = State.PLAYER_TURN;
+        this.engine  = new OurEngine(difficulty);
+        this.state   = State.PLAYER_TURN;
         this.currentTurn = Color.RED;
         this.selectedPiece = null;
         this.validMoves.clear();
@@ -176,5 +176,5 @@ public class GameController {
     }
 
     public State getState()       { return state; }
-    public Color getCurrentTurn()  { return currentTurn; }
+    public Color getCurrentTurn() { return currentTurn; }
 }

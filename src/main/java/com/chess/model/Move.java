@@ -1,5 +1,7 @@
 package com.chess.model;
 
+import java.util.Objects;
+
 public class Move {
     public final int fromRow, fromCol;
     public final int toRow, toCol;
@@ -27,6 +29,22 @@ public class Move {
         board.set(toRow, toCol, captured);
         piece.row = fromRow;
         piece.col = fromCol;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Move move = (Move) o;
+        return fromRow == move.fromRow && fromCol == move.fromCol
+                && toRow == move.toRow && toCol == move.toCol
+                && piece.color == move.piece.color
+                && piece.type == move.piece.type;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(fromRow, fromCol, toRow, toCol, piece.color, piece.type);
     }
 
     @Override
