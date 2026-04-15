@@ -162,7 +162,7 @@ public class MoveValidator {
             int[] cols = {pawn.col - 1, pawn.col + 1};
             for (int nc : cols) {
                 if (nc >= 0 && nc < Board.COLS) {
-                    if (isEnemy(board, pawn.row, nc, pawn.color)) {
+                    if (isEmpty(board, pawn.row, nc) || isEnemy(board, pawn.row, nc, pawn.color)) {
                         moves.add(new Move(pawn, pawn.row, nc));
                     }
                 }
