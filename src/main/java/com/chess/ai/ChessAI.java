@@ -2,6 +2,7 @@ package com.chess.ai;
 
 import com.chess.model.*;
 import java.util.*;
+import java.util.concurrent.*;
 
 /**
  * 中国象棋 AI — 专家增强版
@@ -25,6 +26,9 @@ public class ChessAI {
     private long searchStartMs = 0;
     private static final long TIME_LIMIT_MS = 8000;
     private static final long SOFT_TIME_LIMIT_MS = 6000;
+
+    // 多线程搜索参数
+    private static final int THREAD_COUNT = Math.max(1, Runtime.getRuntime().availableProcessors() - 1);
 
     // Zobrist 哈希
     private static final long[][] PIECE_KEYS = new long[7][2];
@@ -88,6 +92,16 @@ public class ChessAI {
         // 按 MVV-LVA 预排序
         rootMoves.sort((a, b) -> mvvScore(b) - mvvScore(a));
 
+        // 多线程搜索（仅HARD模式且线程数>1）
+        if (THREAD_COUNT > 1 && maxDepth >= 8) {
+            return getBestMoveParallel(board, color, rootMoves);
+        }
+
+        return getBestMoveSingle(board, color, rootMoves);
+    }
+
+    /** 单线程搜索（提取自原getBestMove） */
+    private Move getBestMoveSingle(Board board, Color color, List<Move> rootMoves) {
         // 根节点缓存：将上一层的最佳着法移到最前面优先搜索
         if (lastBestMove != null) {
             for (int i = 0; i < rootMoves.size(); i++) {
@@ -163,6 +177,104 @@ public class ChessAI {
         return bestMove;
     }
 
+    /** 多线程并行搜索：将根节点着法分组并行评估 */
+    private Move getBestMoveParallel(Board board, Color color, List<Move> rootMoves) {
+        // 根节点缓存
+        if (lastBestMove != null) {
+            for (int i = 0; i < rootMoves.size(); i++) {
+                Move m = rootMoves.get(i);
+                if (m.fromRow == lastBestMove.fromRow && m.fromCol == lastBestMove.fromCol
+                        && m.toRow == lastBestMove.toRow && m.toCol == lastBestMove.toCol) {
+                    rootMoves.remove(i);
+                    rootMoves.add(0, m);
+                    break;
+                }
+            }
+        }
+
+        int threads = Math.min(THREAD_COUNT, 4);
+        ExecutorService executor = Executors.newFixedThreadPool(threads);
+        List<Future<MoveScore>> futures = new ArrayList<>();
+
+        // 将着法分成多组，每组一个线程
+        int groupSize = Math.max(1, (rootMoves.size() + threads - 1) / threads);
+        for (int i = 0; i < threads; i++) {
+            final int start = i * groupSize;
+            final int end = Math.min(start + groupSize, rootMoves.size());
+            if (start >= end) break;
+
+            futures.add(executor.submit(() -> {
+                Board b = board.copy();
+                ChessAI ai = new ChessAI(Difficulty.HARD);
+                ai.searchStartMs = searchStartMs;
+
+                Move localBestMove = null;
+                int localBestScore = Integer.MIN_VALUE + 1;
+
+                for (int depth = 3; depth <= maxDepth; depth++) {
+                    if (ai.timeOut()) break;
+                    ai.sortMoves(rootMoves, color, 0);
+
+                    int window = depth >= 4 ? 30 : 50;
+                    int alpha = localBestScore == Integer.MIN_VALUE + 1
+                            ? Integer.MIN_VALUE + 1 : Math.max(Integer.MIN_VALUE + 1, localBestScore - window);
+                    int beta = localBestScore == Integer.MIN_VALUE + 1
+                            ? Integer.MAX_VALUE - 1 : Math.min(Integer.MAX_VALUE - 1, localBestScore + window);
+
+                    for (int j = start; j < end && j < rootMoves.size(); j++) {
+                        if (ai.timeOut()) break;
+                        Move move = rootMoves.get(j);
+                        move.execute(b);
+                        int score = -ai.alphaBeta(b, depth - 1, -beta, -alpha, color.opposite(), 1);
+                        move.undo(b);
+
+                        if (score > localBestScore) {
+                            localBestScore = score;
+                            localBestMove = move;
+                        }
+                    }
+                }
+
+                return new MoveScore(localBestMove, localBestScore);
+            }));
+        }
+
+        // 收集结果
+        Move bestMove = rootMoves.get(0);
+        int bestScore = Integer.MIN_VALUE + 1;
+        for (Future<MoveScore> future : futures) {
+            try {
+                MoveScore ms = future.get();
+                if (ms.move != null && ms.score > bestScore) {
+                    bestScore = ms.score;
+                    bestMove = ms.move;
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        executor.shutdown();
+
+        long elapsed = System.currentTimeMillis() - searchStartMs;
+        System.out.println("[AI] d=" + maxDepth + " n=" + nodesSearched
+                + " s=" + bestScore + " t=" + elapsed + "ms -> " + bestMove);
+
+        lastBestMove = bestMove;
+        lastBestScore = bestScore;
+        return bestMove;
+    }
+
+    /** 搜索结果包装类 */
+    private static class MoveScore {
+        final Move move;
+        final int score;
+        MoveScore(Move move, int score) {
+            this.move = move;
+            this.score = score;
+        }
+    }
+
     private boolean timeOut() {
         return System.currentTimeMillis() - searchStartMs > SOFT_TIME_LIMIT_MS;
     }
@@ -226,7 +338,7 @@ public class ChessAI {
     }
 
     // ==================== Alpha-Beta Search ====================
-    private int alphaBeta(Board board, int depth, int alpha, int beta,
+    int alphaBeta(Board board, int depth, int alpha, int beta,
                           Color color, int ply) {
         if (timeOut()) return 0;
         nodesSearched++;
