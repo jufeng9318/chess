@@ -23,7 +23,8 @@ public class ChessAI {
 
     private int nodesSearched = 0;
     private long searchStartMs = 0;
-    private static final long TIME_LIMIT_MS = 6000;
+    private static final long TIME_LIMIT_MS = 8000;
+    private static final long SOFT_TIME_LIMIT_MS = 6000;
 
     // Zobrist 哈希
     private static final long[][] PIECE_KEYS = new long[7][2];
@@ -38,10 +39,11 @@ public class ChessAI {
 
     // 置换表（定长数组，比 HashMap 更快）
     private static final long TT_EMPTY = Long.MAX_VALUE;
-    private final long[]  ttHash  = new long[65536];
-    private final int[]   ttScore = new int[65536];
-    private final byte[]  ttDepth = new byte[65536];
-    private final byte[]  ttType  = new byte[65536];
+    private static final int TT_SIZE = 1_048_576; // 2^20 约100万项
+    private final long[]  ttHash  = new long[TT_SIZE];
+    private final int[]   ttScore = new int[TT_SIZE];
+    private final byte[]  ttDepth = new byte[TT_SIZE];
+    private final byte[]  ttType  = new byte[TT_SIZE];
     private static final int TT_ALPHA = 0, TT_BETA = 1, TT_EXACT = 2;
 
     // History Heuristic（每个格子一个分数）
@@ -55,11 +57,17 @@ public class ChessAI {
         this.maxDepth = switch (difficulty) {
             case EASY -> 4;
             case MEDIUM -> 6;
-            case HARD -> 8;
+            case HARD -> 10;
         };
         this.evaluator = new Evaluator();
         Arrays.fill(ttHash, TT_EMPTY);
     }
+
+    private Move lastBestMove = null;
+    private int lastBestScore = Integer.MIN_VALUE + 1;
+
+    // 开局库
+    private final OpeningBook openingBook = new OpeningBook();
 
     public Move getBestMove(Board board, Color color) {
         nodesSearched = 0;
@@ -67,11 +75,31 @@ public class ChessAI {
         Arrays.fill(historyRed,   0);
         Arrays.fill(historyBlack, 0);
 
+        // 优先查询开局库
+        Move bookMove = openingBook.findBookMove(board, color);
+        if (bookMove != null) {
+            System.out.println("[AI] Book move: " + bookMove);
+            return bookMove;
+        }
+
         List<Move> rootMoves = MoveValidator.getAllLegalMoves(board, color);
         if (rootMoves.isEmpty()) return null;
 
         // 按 MVV-LVA 预排序
         rootMoves.sort((a, b) -> mvvScore(b) - mvvScore(a));
+
+        // 根节点缓存：将上一层的最佳着法移到最前面优先搜索
+        if (lastBestMove != null) {
+            for (int i = 0; i < rootMoves.size(); i++) {
+                Move m = rootMoves.get(i);
+                if (m.fromRow == lastBestMove.fromRow && m.fromCol == lastBestMove.fromCol
+                        && m.toRow == lastBestMove.toRow && m.toCol == lastBestMove.toCol) {
+                    rootMoves.remove(i);
+                    rootMoves.add(0, m);
+                    break;
+                }
+            }
+        }
 
         Move bestMove = rootMoves.get(0);
         int bestScore = Integer.MIN_VALUE + 1;
@@ -129,11 +157,14 @@ public class ChessAI {
         long elapsed = System.currentTimeMillis() - searchStartMs;
         System.out.println("[AI] d=" + maxDepth + " n=" + nodesSearched
                 + " s=" + bestScore + " t=" + elapsed + "ms -> " + bestMove);
+        
+        lastBestMove = bestMove;
+        lastBestScore = bestScore;
         return bestMove;
     }
 
     private boolean timeOut() {
-        return System.currentTimeMillis() - searchStartMs > TIME_LIMIT_MS;
+        return System.currentTimeMillis() - searchStartMs > SOFT_TIME_LIMIT_MS;
     }
 
     // ==================== Zobrist Hash ====================
@@ -153,7 +184,7 @@ public class ChessAI {
     }
 
     // ==================== Transposition Table ====================
-    private int ttIdx(long hash) { return (int) (hash & 0xFFFF); }
+    private int ttIdx(long hash) { return (int) (hash & (TT_SIZE - 1)); }
 
     private int ttProbe(long hash, int depth, int alpha, int beta) {
         int idx = ttIdx(hash);

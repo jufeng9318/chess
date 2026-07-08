@@ -174,7 +174,24 @@ public class Evaluator {
         if (rMat < bMat - V_CHARIOT) redScore   -= 30; // 红少子，避免换子
         if (bMat < rMat - V_CHARIOT) blackScore -= 30; // 黑少子，避免换子
 
-        // 4. 局势：将帅对面/将军
+        // 4. 大子活动性（车、马、炮）
+        redScore   += pieceActivity(board, Color.RED);
+        blackScore += pieceActivity(board, Color.BLACK);
+
+        // 5. 空头炮/重炮威胁
+        redScore   += cannonThreats(board, Color.RED);
+        blackScore += cannonThreats(board, Color.BLACK);
+
+        // 6. 将军威胁（将军方加分，被将军方减分）
+        if (MoveValidator.isCheck(board, Color.BLACK)) redScore   += 80;
+        if (MoveValidator.isCheck(board, Color.RED))   blackScore += 80;
+
+        // 7. 残局调整
+        int endgameAdj = endgameAdjustment(board, rMat + bMat);
+        redScore   += endgameAdj;
+        blackScore -= endgameAdj;
+
+        // 8. 局势：将帅对面/将军
         if (MoveValidator.isKingsFacing(board)) {
             // 将帅对面：红方被将（黑方威胁更大）
             if (MoveValidator.isCheck(board, Color.RED))   redScore   -= 100;
@@ -326,5 +343,137 @@ public class Evaluator {
         int total = 0;
         for (Piece p : pieces) total += getBaseValue(p.type);
         return total;
+    }
+
+    // ===================== 大子活动性评估 =====================
+    /** 车、马、炮的活动性加分 */
+    private int pieceActivity(Board board, Color color) {
+        int score = 0;
+        for (Piece p : board.getAllPieces(color)) {
+            if (p.type == PieceType.CHARIOT) {
+                score += chariotActivity(board, p);
+            } else if (p.type == PieceType.HORSE) {
+                score += horseMobility(board, p);
+            } else if (p.type == PieceType.CANNON) {
+                score += cannonActivity(board, p);
+            }
+        }
+        return score;
+    }
+
+    /** 车活动性：路畅通加分 */
+    private int chariotActivity(Board board, Piece chariot) {
+        int openLines = 0;
+        int[][] dirs = {{0,1},{0,-1},{1,0},{-1,0}};
+        for (int[] d : dirs) {
+            int r = chariot.row + d[0], c = chariot.col + d[1];
+            int steps = 0;
+            while (r >= 0 && r < Board.ROWS && c >= 0 && c < Board.COLS && steps < 5) {
+                if (board.get(r, c) == null) {
+                    openLines++;
+                } else {
+                    openLines += 2; // 有吃子机会也加分
+                    break;
+                }
+                r += d[0]; c += d[1]; steps++;
+            }
+        }
+        return openLines * 3;
+    }
+
+    /** 马活动性：可选着点数量 */
+    private int horseMobility(Board board, Piece horse) {
+        int moves = MoveValidator.getLegalMoves(board, horse).size();
+        return moves * 4;
+    }
+
+    /** 炮活动性 */
+    private int cannonActivity(Board board, Piece cannon) {
+        int score = 0;
+        int[][] dirs = {{0,1},{0,-1},{1,0},{-1,0}};
+        for (int[] d : dirs) {
+            int r = cannon.row + d[0], c = cannon.col + d[1];
+            boolean hasPlatform = false;
+            while (r >= 0 && r < Board.ROWS && c >= 0 && c < Board.COLS) {
+                Piece p = board.get(r, c);
+                if (p != null) {
+                    if (!hasPlatform) {
+                        hasPlatform = true; // 找到炮架
+                    } else {
+                        if (p.color != cannon.color) score += 6; // 有吃子威胁
+                        break;
+                    }
+                }
+                r += d[0]; c += d[1];
+            }
+        }
+        return score;
+    }
+
+    // ===================== 炮威胁评估 =====================
+    /** 空头炮、重炮、炮牵制威胁 */
+    private int cannonThreats(Board board, Color color) {
+        int score = 0;
+        List<Piece> cannons = new ArrayList<>();
+        for (Piece p : board.getAllPieces(color)) {
+            if (p.type == PieceType.CANNON) cannons.add(p);
+        }
+        // 重炮（两条炮在同一条线上有威胁）
+        if (cannons.size() >= 2) {
+            for (int i = 0; i < cannons.size(); i++) {
+                for (int j = i + 1; j < cannons.size(); j++) {
+                    Piece c1 = cannons.get(i), c2 = cannons.get(j);
+                    if (c1.col == c2.col || c1.row == c2.row) {
+                        score += 15; // 重炮威胁
+                    }
+                }
+            }
+        }
+        // 空头炮：炮直接将军
+        for (Piece cannon : cannons) {
+            int[][] dirs = {{0,1},{0,-1},{1,0},{-1,0}};
+            for (int[] d : dirs) {
+                int r = cannon.row + d[0], c = cannon.col + d[1];
+                boolean jumped = false;
+                while (r >= 0 && r < Board.ROWS && c >= 0 && c < Board.COLS) {
+                    Piece p = board.get(r, c);
+                    if (p != null) {
+                        if (!jumped) {
+                            jumped = true;
+                        } else if (p.type == PieceType.KING && p.color != color) {
+                            score += 25; // 空头炮将军威胁
+                        }
+                        break;
+                    }
+                    r += d[0]; c += d[1];
+                }
+            }
+        }
+        return score;
+    }
+
+    // ===================== 残局调整 =====================
+    /** 根据剩余子力动态调整评估策略 */
+    private int endgameAdjustment(Board board, int totalMaterial) {
+        // 使用EndgameTable进行残局评估
+        if (EndgameTable.isEndgame(board)) {
+            return EndgameTable.endgameEval(board);
+        }
+        
+        int score = 0;
+        // 残局阶段（子力较少）
+        if (totalMaterial < V_CHARIOT * 2) {
+            // 残局：兵卒价值提升
+            for (int r = 0; r < Board.ROWS; r++) {
+                for (int c = 0; c < Board.COLS; c++) {
+                    Piece p = board.get(r, c);
+                    if (p != null && p.type == PieceType.PAWN) {
+                        int distToKing = Math.abs(p.row - (p.color == Color.RED ? 0 : 9));
+                        score += (10 - distToKing) * 5 * (p.color == Color.RED ? 1 : -1);
+                    }
+                }
+            }
+        }
+        return score;
     }
 }
