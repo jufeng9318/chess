@@ -211,17 +211,17 @@ public class Evaluator {
         int bonus = 0;
 
         // 转换为红方视角行（0=黑底线，9=红底线）
-        int redRow = 9 - p.row;
+        int pstRow = (p.color == Color.RED) ? p.row : (9 - p.row);
         int col = p.col;
 
         // 位置加成表
         bonus += switch (p.type) {
-            case CHARIOT  -> CHARIOT_PST[redRow][col];
-            case CANNON   -> CANNON_PST[redRow][col];
-            case HORSE    -> HORSE_PST[redRow][col];
-            case PAWN     -> PAWN_PST[redRow][col];
-            case ADVISOR  -> ADVISOR_PST[redRow][col];
-            case ELEPHANT -> ELEPHANT_PST[redRow][col];
+            case CHARIOT  -> CHARIOT_PST[pstRow][col];
+            case CANNON   -> CANNON_PST[pstRow][col];
+            case HORSE    -> HORSE_PST[pstRow][col];
+            case PAWN     -> PAWN_PST[pstRow][col];
+            case ADVISOR  -> ADVISOR_PST[pstRow][col];
+            case ELEPHANT -> ELEPHANT_PST[pstRow][col];
             default       -> 0;
         };
 
@@ -262,7 +262,7 @@ public class Evaluator {
     /** 马被蹩腿惩罚 */
     private int horseBlockPenalty(Board board, Piece horse) {
         int[][] dirs = {{-2,-1},{-2,1},{-1,-2},{-1,2},{1,-2},{1,2},{2,-1},{2,1}};
-        int[][] blocks = {{0,-1},{-1,0},{-1,0},{0,1},{0,-1},{1,0},{1,0},{0,1}};
+        int[][] blocks = {{-1,0},{-1,0},{0,-1},{0,1},{0,-1},{0,1},{1,0},{1,0}};
         int blocked = 0;
         for (int i = 0; i < 8; i++) {
             int br = horse.row + blocks[i][0];
@@ -455,25 +455,10 @@ public class Evaluator {
     // ===================== 残局调整 =====================
     /** 根据剩余子力动态调整评估策略 */
     private int endgameAdjustment(Board board, int totalMaterial) {
-        // 使用EndgameTable进行残局评估
+        // 使用EndgameTable进行残局评估（避免与pieceValue中兵卒加分重复）
         if (EndgameTable.isEndgame(board)) {
             return EndgameTable.endgameEval(board);
         }
-        
-        int score = 0;
-        // 残局阶段（子力较少）
-        if (totalMaterial < V_CHARIOT * 2) {
-            // 残局：兵卒价值提升
-            for (int r = 0; r < Board.ROWS; r++) {
-                for (int c = 0; c < Board.COLS; c++) {
-                    Piece p = board.get(r, c);
-                    if (p != null && p.type == PieceType.PAWN) {
-                        int distToKing = Math.abs(p.row - (p.color == Color.RED ? 0 : 9));
-                        score += (10 - distToKing) * 5 * (p.color == Color.RED ? 1 : -1);
-                    }
-                }
-            }
-        }
-        return score;
+        return 0;
     }
 }

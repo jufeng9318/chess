@@ -78,7 +78,7 @@ public class Board {
         Board b = new Board();
         for (int r = 0; r < ROWS; r++)
             for (int c = 0; c < COLS; c++)
-                b.grid[r][c] = this.grid[r][c];
+                b.grid[r][c] = (this.grid[r][c] != null) ? this.grid[r][c].copy() : null;
         return b;
     }
 

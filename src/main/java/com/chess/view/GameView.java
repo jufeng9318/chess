@@ -21,6 +21,7 @@ public class GameView {
     private Stage         stage;
     private BoardCanvas   boardCanvas;
     private GameController controller;
+    private Label         statusLabel;
 
     public void show() {
         stage = new Stage();
@@ -64,9 +65,14 @@ public class GameView {
         turnLabel.setFont(Font.font("KaiTi", FontWeight.BOLD, 15));
         turnLabel.setTextFill(Color.web("#8B0000"));
 
-        Label statusLabel = new Label("红方回合");
+        statusLabel = new Label("红方回合");
         statusLabel.setFont(Font.font("KaiTi", FontPosture.ITALIC, 13));
         statusLabel.setTextFill(Color.web("#5C3A1E"));
+
+        // 注册状态监听器
+        controller.setStatusListener(status -> {
+            javafx.application.Platform.runLater(() -> statusLabel.setText(status));
+        });
 
         HBox toolbar = new HBox(18);
         toolbar.setPadding(new Insets(10, 20, 10, 20));
@@ -98,7 +104,6 @@ public class GameView {
 
         stage.setOnCloseRequest(e -> {
             javafx.application.Platform.exit();
-            System.exit(0);
         });
     }
 }

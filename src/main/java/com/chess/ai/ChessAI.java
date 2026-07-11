@@ -30,14 +30,16 @@ public class ChessAI {
     // 多线程搜索参数
     private static final int THREAD_COUNT = Math.max(1, Runtime.getRuntime().availableProcessors() - 1);
 
-    // Zobrist 哈希
-    private static final long[][] PIECE_KEYS = new long[7][2];
+    // Zobrist 哈希（包含位置信息）
+    private static final long[][][][] PIECE_KEYS = new long[10][9][7][2];
     private static final long SIDE_KEY;
     static {
         Random rng = new Random(42);
-        for (int t = 0; t < 7; t++)
-            for (int c = 0; c < 2; c++)
-                PIECE_KEYS[t][c] = rng.nextLong();
+        for (int r = 0; r < 10; r++)
+            for (int c = 0; c < 9; c++)
+                for (int t = 0; t < 7; t++)
+                    for (int ci = 0; ci < 2; ci++)
+                        PIECE_KEYS[r][c][t][ci] = rng.nextLong();
         SIDE_KEY = rng.nextLong();
     }
 
@@ -208,12 +210,22 @@ public class ChessAI {
                 ChessAI ai = new ChessAI(Difficulty.HARD);
                 ai.searchStartMs = searchStartMs;
 
+                // 创建本地Move列表，引用新board上的piece，避免多线程竞争
+                List<Move> localMoves = new ArrayList<>();
+                for (int j = start; j < end && j < rootMoves.size(); j++) {
+                    Move m = rootMoves.get(j);
+                    Piece p = b.get(m.fromRow, m.fromCol);
+                    if (p != null && p.type == m.piece.type && p.color == m.piece.color) {
+                        localMoves.add(new Move(p, m.toRow, m.toCol));
+                    }
+                }
+
                 Move localBestMove = null;
                 int localBestScore = Integer.MIN_VALUE + 1;
 
                 for (int depth = 3; depth <= maxDepth; depth++) {
                     if (ai.timeOut()) break;
-                    ai.sortMoves(rootMoves, color, 0);
+                    ai.sortMoves(localMoves, color, 0);
 
                     int window = depth >= 4 ? 30 : 50;
                     int alpha = localBestScore == Integer.MIN_VALUE + 1
@@ -221,9 +233,8 @@ public class ChessAI {
                     int beta = localBestScore == Integer.MIN_VALUE + 1
                             ? Integer.MAX_VALUE - 1 : Math.min(Integer.MAX_VALUE - 1, localBestScore + window);
 
-                    for (int j = start; j < end && j < rootMoves.size(); j++) {
+                    for (Move move : localMoves) {
                         if (ai.timeOut()) break;
-                        Move move = rootMoves.get(j);
                         move.execute(b);
                         int score = -ai.alphaBeta(b, depth - 1, -beta, -alpha, color.opposite(), 1);
                         move.undo(b);
@@ -235,7 +246,19 @@ public class ChessAI {
                     }
                 }
 
-                return new MoveScore(localBestMove, localBestScore);
+                // 映射回原始Move
+                Move resultMove = null;
+                if (localBestMove != null) {
+                    for (int j = start; j < end && j < rootMoves.size(); j++) {
+                        Move m = rootMoves.get(j);
+                        if (m.fromRow == localBestMove.fromRow && m.fromCol == localBestMove.fromCol
+                                && m.toRow == localBestMove.toRow && m.toCol == localBestMove.toCol) {
+                            resultMove = m;
+                            break;
+                        }
+                    }
+                }
+                return new MoveScore(resultMove, localBestScore);
             }));
         }
 
@@ -255,6 +278,13 @@ public class ChessAI {
         }
 
         executor.shutdown();
+        try {
+            if (!executor.awaitTermination(60, TimeUnit.SECONDS)) {
+                executor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            executor.shutdownNow();
+        }
 
         long elapsed = System.currentTimeMillis() - searchStartMs;
         System.out.println("[AI] d=" + maxDepth + " n=" + nodesSearched
@@ -287,7 +317,7 @@ public class ChessAI {
                 Piece p = board.get(r, c);
                 if (p != null) {
                     int ci = p.color == Color.RED ? 0 : 1;
-                    h ^= PIECE_KEYS[p.type.ordinal()][ci];
+                    h ^= PIECE_KEYS[r][c][p.type.ordinal()][ci];
                 }
             }
         }
@@ -346,9 +376,7 @@ public class ChessAI {
         List<Move> moves = MoveValidator.getAllLegalMoves(board, color);
         if (moves.isEmpty()) {
             if (MoveValidator.isCheck(board, color)) {
-                return color == Color.RED
-                        ? -(90000 + ply * 50)
-                        :  (90000 + ply * 50);
+                return -(90000 + ply * 50);
             }
             return 0;
         }
@@ -372,8 +400,7 @@ public class ChessAI {
             searchLimit = 12;
         }
 
-        boolean isRed = (color == Color.RED);
-        int best = isRed ? Integer.MIN_VALUE + 1 : Integer.MAX_VALUE - 1;
+        int best = Integer.MIN_VALUE + 1;
 
         for (int i = 0; i < searchLimit && i < moves.size(); i++) {
             if (timeOut()) break;
@@ -402,13 +429,8 @@ public class ChessAI {
                 }
             }
 
-            if (isRed) {
-                if (score > best) best = score;
-                if (score > alpha) alpha = score;
-            } else {
-                if (score < best) best = score;
-                if (score < beta)  beta  = score;
-            }
+            if (score > best) best = score;
+            if (score > alpha) alpha = score;
 
             if (beta <= alpha) {
                 if (move.captured == null) recordKiller(move, ply);
@@ -439,7 +461,7 @@ public class ChessAI {
         List<Move> caps = new ArrayList<>();
         for (Piece p : board.getAllPieces(color)) {
             for (Move m : MoveValidator.getLegalMoves(board, p)) {
-                if (m.captured != null) caps.add(m);
+                if (board.get(m.toRow, m.toCol) != null) caps.add(m);
             }
         }
         if (caps.isEmpty()) return standPat;

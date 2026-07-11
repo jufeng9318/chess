@@ -25,6 +25,11 @@ public class Piece {
         };
     }
 
+    /** 深拷贝 */
+    public Piece copy() {
+        return new Piece(type, color, row, col);
+    }
+
     @Override
     public String toString() {
         return color + " " + type;

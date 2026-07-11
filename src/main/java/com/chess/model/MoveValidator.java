@@ -69,7 +69,7 @@ public class MoveValidator {
             int nr = elephant.row + d[0];
             int nc = elephant.col + d[1];
             if (nr < 0 || nr >= Board.ROWS || nc < 0 || nc >= Board.COLS) continue;
-            if (!inRiver(elephant.color, nr)) continue; // 不过河
+            if (inRiver(elephant.color, nr)) continue; // 象不能过河
             int eyeRow = (elephant.row + nr) / 2;
             int eyeCol = (elephant.col + nc) / 2;
             if (isEmpty(board, eyeRow, eyeCol)) {

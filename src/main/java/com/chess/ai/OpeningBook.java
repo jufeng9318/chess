@@ -25,11 +25,12 @@ public class OpeningBook {
         if (moves == null || moves.isEmpty()) return null;
 
         // 按评分排序，优先返回高分变化
-        moves.sort((a, b) -> Integer.compare(b.score, a.score));
+        List<BookMove> sorted = new ArrayList<>(moves);
+        sorted.sort((a, b) -> Integer.compare(b.score, a.score));
 
         // 从前1/3的高分变化中随机选择（增加多样性）
-        int topCount = Math.max(1, moves.size() / 3);
-        BookMove bm = moves.get(new Random().nextInt(topCount));
+        int topCount = Math.max(1, sorted.size() / 3);
+        BookMove bm = sorted.get(new Random().nextInt(topCount));
         Piece piece = board.get(bm.fromRow, bm.fromCol);
         if (piece == null || piece.color != color) return null;
 

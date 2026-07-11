@@ -25,6 +25,18 @@ public class GameController {
     private final Stack<Move> moveHistory = new Stack<>();  // 走子历史
     private boolean  canUndo = false;  // 是否可以悔棋
 
+    /** 状态变化监听器 */
+    public interface StatusListener {
+        void onStatusChange(String status);
+    }
+    private StatusListener statusListener;
+    public void setStatusListener(StatusListener listener) {
+        this.statusListener = listener;
+    }
+    private void notifyStatus(String status) {
+        if (statusListener != null) statusListener.onStatusChange(status);
+    }
+
     public GameController(BoardCanvas canvas, Difficulty difficulty) {
         this.canvas      = canvas;
         this.board       = canvas.getBoard();
@@ -85,6 +97,18 @@ public class GameController {
         return null;
     }
 
+    /** 根据坐标找到board上的合法Move（用于AI线程返回后映射） */
+    private Move findMoveByCoords(int fromRow, int fromCol, int toRow, int toCol) {
+        Piece piece = board.get(fromRow, fromCol);
+        if (piece == null) return null;
+        List<Move> moves = MoveValidator.getLegalMoves(board, piece);
+        moves = MoveValidator.filterMovesCausingOwnCheck(board, moves);
+        for (Move m : moves) {
+            if (m.toRow == toRow && m.toCol == toCol) return m;
+        }
+        return null;
+    }
+
     private void executeMove(Piece piece, int toRow, int toCol) {
         Move move = findMove(piece, toRow, toCol);
         if (move == null) return;
@@ -100,6 +124,7 @@ public class GameController {
         canvas.draw();
 
         if (currentTurn == aiColor()) {
+            notifyStatus("AI思考中...");
             startAIThinking();
         }
     }
@@ -110,21 +135,27 @@ public class GameController {
 
     private void startAIThinking() {
         state = State.AI_THINKING;
+        Board boardCopy = board.copy();
 
         Thread aiThread = new Thread(() -> {
             try { Thread.sleep(300); } catch (InterruptedException e) {}
 
-            Move resultMove = engine.getBestMove(board, aiColor());
+            Move resultMove = engine.getBestMove(boardCopy, aiColor());
 
             Platform.runLater(() -> {
-                if (resultMove != null) {
-                    resultMove.execute(board);
-                    moveHistory.push(resultMove);
+                Move actualMove = findMoveByCoords(
+                    resultMove.fromRow, resultMove.fromCol,
+                    resultMove.toRow, resultMove.toCol
+                );
+                if (actualMove != null) {
+                    actualMove.execute(board);
+                    moveHistory.push(actualMove);
                     canvas.draw();
 
                     if (!checkGameOver()) {
                         currentTurn = currentTurn.opposite();
                         state = State.PLAYER_TURN;
+                        notifyStatus("红方回合");
                     }
                 } else {
                     state = State.GAME_OVER;
@@ -146,6 +177,7 @@ public class GameController {
             } else {
                 onDraw();
             }
+            notifyStatus("游戏结束");
             return true;
         }
         return false;
@@ -172,8 +204,9 @@ public class GameController {
         this.board  = new Board();
         this.board.init();
         this.engine  = new OurEngine(difficulty);
-        this.state   = State.PLAYER_TURN;
+        this.state = State.PLAYER_TURN;
         this.currentTurn = Color.RED;
+        notifyStatus("红方回合");
         this.selectedPiece = null;
         this.validMoves.clear();
         this.moveHistory.clear();
@@ -205,6 +238,7 @@ public class GameController {
         }
         state = State.PLAYER_TURN;
         currentTurn = playerColor;
+        notifyStatus("红方回合");
         selectedPiece = null;
         validMoves.clear();
         canvas.clearSelection();
