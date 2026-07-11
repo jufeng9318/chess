@@ -22,6 +22,8 @@ public class GameController {
     private Piece    selectedPiece;
     private List<Move> validMoves;
     private Color    playerColor;  // 玩家执红
+    private final Stack<Move> moveHistory = new Stack<>();  // 走子历史
+    private boolean  canUndo = false;  // 是否可以悔棋
 
     public GameController(BoardCanvas canvas, Difficulty difficulty) {
         this.canvas      = canvas;
@@ -88,6 +90,8 @@ public class GameController {
         if (move == null) return;
 
         move.execute(board);
+        moveHistory.push(move);
+        canUndo = true;
         clearSelection();
 
         if (checkGameOver()) return;
@@ -115,6 +119,7 @@ public class GameController {
             Platform.runLater(() -> {
                 if (resultMove != null) {
                     resultMove.execute(board);
+                    moveHistory.push(resultMove);
                     canvas.draw();
 
                     if (!checkGameOver()) {
@@ -171,8 +176,43 @@ public class GameController {
         this.currentTurn = Color.RED;
         this.selectedPiece = null;
         this.validMoves.clear();
+        this.moveHistory.clear();
+        this.canUndo = false;
         canvas.setBoard(board);
         canvas.draw();
+    }
+
+    /** 悔棋：撤销AI的步和玩家的步，回到玩家走子前 */
+    public void undoMove() {
+        if (moveHistory.isEmpty() || !canUndo) return;
+        if (state == State.AI_THINKING || state == State.GAME_OVER) return;
+
+        // 如果AI已经走了（当前轮到玩家且history >= 2），先撤销AI的步
+        if (currentTurn == playerColor && moveHistory.size() >= 2) {
+            Move aiMove = moveHistory.pop();
+            aiMove.undo(board);
+        }
+
+        // 撤销玩家的步
+        if (!moveHistory.isEmpty()) {
+            Move playerMove = moveHistory.pop();
+            playerMove.undo(board);
+        }
+
+        // 更新状态
+        if (moveHistory.isEmpty()) {
+            canUndo = false;
+        }
+        state = State.PLAYER_TURN;
+        currentTurn = playerColor;
+        selectedPiece = null;
+        validMoves.clear();
+        canvas.clearSelection();
+        canvas.draw();
+    }
+
+    public boolean canUndo() {
+        return canUndo && !moveHistory.isEmpty() && state != State.AI_THINKING && state != State.GAME_OVER;
     }
 
     public State getState()       { return state; }

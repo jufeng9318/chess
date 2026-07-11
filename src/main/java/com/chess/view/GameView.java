@@ -54,6 +54,12 @@ public class GameView {
             controller.restart(selected);
         });
 
+        Button undoBtn = new Button("悔棋");
+        undoBtn.setMinWidth(80);
+        undoBtn.setOnAction(e -> {
+            controller.undoMove();
+        });
+
         Label turnLabel = new Label("执红先行");
         turnLabel.setFont(Font.font("KaiTi", FontWeight.BOLD, 15));
         turnLabel.setTextFill(Color.web("#8B0000"));
@@ -69,6 +75,7 @@ public class GameView {
             new Label("难度:"),
             difficultyBox,
             newGameBtn,
+            undoBtn,
             new Separator(),
             turnLabel,
             new Separator(),
